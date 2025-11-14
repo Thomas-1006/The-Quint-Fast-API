@@ -4,3 +4,4 @@ gunicorn
 pandas
 google-cloud-bigquery
 python-dotenv
+db-dtypes
