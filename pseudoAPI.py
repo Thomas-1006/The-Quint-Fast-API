@@ -53,14 +53,9 @@ user_summary AS (
 )
 
 SELECT
-  user_pseudo_id,
-  page_views,
-  engagement_rate
+  user_pseudo_id
 FROM user_summary
 WHERE page_views > 0
-ORDER BY
-  page_views DESC,
-  engagement_rate DESC
 LIMIT 10;
 """
 
