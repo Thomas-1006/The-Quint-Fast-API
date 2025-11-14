@@ -2,6 +2,21 @@ import os
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from google.cloud import bigquery
+
+import json
+import tempfile
+
+sa_key = os.getenv("GCP_SERVICE_ACCOUNT_KEY")
+if sa_key:
+    try:
+        json.loads(sa_key)
+        sa_path = os.path.join(tempfile.gettempdir(), "gcp_sa_key.json")
+        with open(sa_path, "w") as f:
+            f.write(sa_key)
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = sa_path
+    except Exception as e:
+        print("Failed to load service account key:", e)
+
 import pandas as pd
 
 # === CONFIG ===
