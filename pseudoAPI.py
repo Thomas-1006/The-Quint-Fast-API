@@ -50,6 +50,10 @@ LIMIT 10;
 """
 
 # === API ROUTE ===
+@app.get("/")
+def root():
+    return {"status": "ok", "message": "API is running! Use /top-users to fetch data."}
+
 @app.get("/top-users")
 def get_top_users():
 
