@@ -67,6 +67,25 @@ def root():
 @app.get("/top-users")
 def get_top_users():
 
+
+    # ==== MANUAL OVERRIDE MODE FOR TESTING ONLY ====
+    # Add any pseudo IDs you want to test with
+    TEST_PSEUDO_IDS = [
+        "1949675162.1731393103",   # your personal pseudo id
+        # "1234567890.1112131415", # example extra
+        # Add more here
+    ]
+
+    # If this list is NOT empty → return these IDs only
+    if TEST_PSEUDO_IDS:
+        return {
+            "status": "success",
+            "count": len(TEST_PSEUDO_IDS),
+            "data": [{"user_pseudo_id": pid} for pid in TEST_PSEUDO_IDS]
+        }
+
+    # ==== DEFAULT MODE (USES BIGQUERY) ====
+
     try:
         client = bigquery.Client(project=PROJECT_ID)
         df = client.query(QUERY).to_dataframe()
