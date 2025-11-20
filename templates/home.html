@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Manage Test Pseudo IDs</title>
+</head>
+<body>
+    <h2>Manage Test Pseudo IDs</h2>
+
+    <p><b>Current Test IDs:</b></p>
+    <ul id="list"></ul>
+
+    <h3>Add New ID</h3>
+    <input id="newid" placeholder="Enter pseudo ID">
+    <button onclick="addId()">Add</button>
+
+    <script>
+        async function loadIds() {
+            const res = await fetch('/test-ids');
+            const data = await res.json();
+            const list = document.getElementById('list');
+            list.innerHTML = "";
+
+            data.ids.forEach(id => {
+                const li = document.createElement("li");
+                li.innerHTML = `${id} <button onclick="deleteId('${id}')">Delete</button>`;
+                list.appendChild(li);
+            });
+        }
+
+        async function addId() {
+            const pid = document.getElementById("newid").value;
+            await fetch('/test-ids?pid=' + pid, { method: 'POST' });
+            loadIds();
+        }
+
+        async function deleteId(pid) {
+            await fetch('/test-ids/' + pid, { method: 'DELETE' });
+            loadIds();
+        }
+
+        loadIds();
+    </script>
+</body>
+</html>

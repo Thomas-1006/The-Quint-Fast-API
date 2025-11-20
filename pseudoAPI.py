@@ -1,11 +1,15 @@
 import os
-from fastapi import FastAPI
-from fastapi.responses import JSONResponse
-from google.cloud import bigquery
-
 import json
 import tempfile
+import pandas as pd
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
+from google.cloud import bigquery
 
+# =======================
+# LOAD GOOGLE CREDENTIALS
+# =======================
 sa_key = os.getenv("GCP_SERVICE_ACCOUNT_KEY")
 if sa_key:
     try:
@@ -17,19 +21,16 @@ if sa_key:
     except Exception as e:
         print("Failed to load service account key:", e)
 
-import pandas as pd
+# =====================
+# FASTAPI INITIALIZATION
+# =====================
+app = FastAPI(title="Quint FastAPI", version="1.0")
 
-# === CONFIG ===
-PROJECT_ID = os.getenv("BQ_PROJECT_ID", "the-quint-282107")
-
-# === INITIALIZE APP ===
-app = FastAPI(title="Local BigQuery Test API", version="1.0")
-
-from fastapi.middleware.cors import CORSMiddleware
-
+# CORS CONFIG
 ALLOWED_ORIGINS = [
-    "https://thequint-malibu-beta.quintype.io",    # Quint Beta
-    "https://www.thequint.com",     # Quint Prod
+    "https://thequint-malibu-beta.quintype.io",   # Beta
+    "https://www.thequint.com",                   # Prod
+    "https://thequint.com",
 ]
 
 app.add_middleware(
@@ -40,8 +41,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# BigQuery Config
+PROJECT_ID = os.getenv("BQ_PROJECT_ID", "the-quint-282107")
 
-# === SQL QUERY ===
+# ====================
+# TEST ID STORAGE FILE
+# ====================
+TEST_IDS_FILE = "test_ids.json"
+
+def load_test_ids():
+    try:
+        with open(TEST_IDS_FILE, "r") as f:
+            return json.load(f).get("ids", [])
+    except:
+        return []
+
+def save_test_ids(ids):
+    with open(TEST_IDS_FILE, "w") as f:
+        json.dump({"ids": ids}, f)
+
+
+# =====================
+# BIGQUERY SQL QUERY
+# =====================
 QUERY = """
 WITH base_events AS (
   SELECT
@@ -57,17 +79,13 @@ WITH base_events AS (
     DATE(TIMESTAMP_MICROS(e.event_timestamp), "Asia/Kolkata") >= '2025-10-01'
     AND _TABLE_SUFFIX BETWEEN '20251001' AND FORMAT_DATE('%Y%m%d', CURRENT_DATE('Asia/Kolkata'))
 ),
-
 user_summary AS (
   SELECT
     user_pseudo_id,
-    COUNTIF(event_name = 'page_view') AS page_views,
-    SUM(engagement_time_msec) AS total_engagement_time_msec,
-    SAFE_DIVIDE(SUM(engagement_time_msec), COUNTIF(event_name = 'page_view')) AS engagement_rate
+    COUNTIF(event_name = 'page_view') AS page_views
   FROM base_events
   GROUP BY user_pseudo_id
 )
-
 SELECT
   user_pseudo_id
 FROM user_summary
@@ -75,24 +93,54 @@ WHERE page_views > 0
 LIMIT 10;
 """
 
-# === API ROUTE ===
-@app.get("/")
-def root():
-    return {"status": "ok", "message": "API is running! Use /top-users to fetch data."}
 
+# ====================
+# HOME UI PAGE
+# ====================
+@app.get("/", response_class=HTMLResponse)
+def home():
+    try:
+        with open("templates/home.html", "r", encoding="utf-8") as f:
+            html = f.read()
+        return HTMLResponse(content=html)
+    except Exception as e:
+        return HTMLResponse(content=f"Error loading HTML file: {e}", status_code=500)
+
+
+# ====================
+# TEST ID API ENDPOINTS
+# ====================
+@app.get("/test-ids")
+def get_test_ids():
+    return {"ids": load_test_ids()}
+
+@app.post("/test-ids")
+def add_test_id(pid: str):
+    ids = load_test_ids()
+    if pid not in ids:
+        ids.append(pid)
+        save_test_ids(ids)
+    return {"status": "added", "ids": ids}
+
+@app.delete("/test-ids/{pid}")
+def delete_test_id(pid: str):
+    ids = load_test_ids()
+    if pid in ids:
+        ids.remove(pid)
+    save_test_ids(ids)
+    return {"status": "deleted", "ids": ids}
+
+
+# ====================
+# MAIN API ENDPOINT
+# ====================
 @app.get("/top-users")
 def get_top_users():
 
+    # 1. Load test IDs
+    TEST_PSEUDO_IDS = load_test_ids()
 
-    # ==== MANUAL OVERRIDE MODE FOR TESTING ONLY ====
-    # Add any pseudo IDs you want to test with
-    TEST_PSEUDO_IDS = [
-        "1949675162.1731393103",   # your personal pseudo id
-        # "1234567890.1112131415", # example extra
-        # Add more here
-    ]
-
-    # If this list is NOT empty → return these IDs only
+    # 2. If test IDs exist → return them
     if TEST_PSEUDO_IDS:
         return {
             "status": "success",
@@ -100,8 +148,7 @@ def get_top_users():
             "data": [{"user_pseudo_id": pid} for pid in TEST_PSEUDO_IDS]
         }
 
-    # ==== DEFAULT MODE (USES BIGQUERY) ====
-
+    # 3. Else → run BigQuery logic
     try:
         client = bigquery.Client(project=PROJECT_ID)
         df = client.query(QUERY).to_dataframe()
@@ -109,22 +156,23 @@ def get_top_users():
         if df.empty:
             return JSONResponse(
                 content={"message": "No data found for the given date range."},
-                status_code=404
+                status_code=404,
             )
 
-        # Convert dataframe to dict for JSON response
         data = df.to_dict(orient="records")
         return {"status": "success", "count": len(data), "data": data}
 
     except Exception as e:
         return JSONResponse(
             content={"status": "error", "message": str(e)},
-            status_code=500
+            status_code=500,
         )
 
 
-# === LOCAL ENTRY POINT ===
+# ====================
+# LOCAL RUN
+# ====================
 if __name__ == "__main__":
     import uvicorn
-    print("Starting local API server at http://127.0.0.1:8000/top-users")
+    print("Starting local API server at http://127.0.0.1:8000/")
     uvicorn.run("pseudoAPI:app", host="127.0.0.1", port=8000, reload=True)
