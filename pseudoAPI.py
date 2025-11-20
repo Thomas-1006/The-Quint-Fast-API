@@ -25,6 +25,22 @@ PROJECT_ID = os.getenv("BQ_PROJECT_ID", "the-quint-282107")
 # === INITIALIZE APP ===
 app = FastAPI(title="Local BigQuery Test API", version="1.0")
 
+from fastapi.middleware.cors import CORSMiddleware
+
+ALLOWED_ORIGINS = [
+    "https://thequint-malibu-beta.quintype.io/",    # Quint Beta
+    "https://www.thequint.com",     # Quint Prod
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 # === SQL QUERY ===
 QUERY = """
 WITH base_events AS (
