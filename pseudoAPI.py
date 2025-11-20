@@ -28,7 +28,7 @@ app = FastAPI(title="Local BigQuery Test API", version="1.0")
 from fastapi.middleware.cors import CORSMiddleware
 
 ALLOWED_ORIGINS = [
-    "https://thequint-malibu-beta.quintype.io/",    # Quint Beta
+    "https://thequint-malibu-beta.quintype.io",    # Quint Beta
     "https://www.thequint.com",     # Quint Prod
 ]
 
