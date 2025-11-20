@@ -1,0 +1,22 @@
+body {
+    background: #f8f9fa;
+    padding-top: 40px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.card {
+    border-radius: 14px;
+}
+
+.delete-btn {
+    font-size: 12px;
+}
+
+.title {
+    font-weight: 700;
+}
+
+.list-group-item {
+    border-radius: 6px !important;
+    margin-bottom: 6px;
+}

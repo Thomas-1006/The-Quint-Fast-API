@@ -6,6 +6,8 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from google.cloud import bigquery
+from fastapi.staticfiles import StaticFiles
+
 
 # =======================
 # LOAD GOOGLE CREDENTIALS
@@ -25,6 +27,7 @@ if sa_key:
 # FASTAPI INITIALIZATION
 # =====================
 app = FastAPI(title="Quint FastAPI", version="1.0")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # CORS CONFIG
 ALLOWED_ORIGINS = [

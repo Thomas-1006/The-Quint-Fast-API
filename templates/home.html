@@ -1,44 +1,81 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manage Test Pseudo IDs</title>
+
+    <!-- Bootstrap 5 -->
+    <link
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+    >
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/style.css">
 </head>
+
 <body>
-    <h2>Manage Test Pseudo IDs</h2>
 
-    <p><b>Current Test IDs:</b></p>
-    <ul id="list"></ul>
+<div class="container" style="max-width: 650px;">
+    <div class="card shadow-sm p-4">
 
-    <h3>Add New ID</h3>
-    <input id="newid" placeholder="Enter pseudo ID">
-    <button onclick="addId()">Add</button>
+        <h3 class="title text-center mb-4">Manage Test Pseudo IDs</h3>
 
-    <script>
-        async function loadIds() {
-            const res = await fetch('/test-ids');
-            const data = await res.json();
-            const list = document.getElementById('list');
-            list.innerHTML = "";
+        <!-- Current IDs list -->
+        <h6 class="mb-2">Current Test IDs:</h6>
+        <ul id="list" class="list-group mb-4"></ul>
 
-            data.ids.forEach(id => {
-                const li = document.createElement("li");
-                li.innerHTML = `${id} <button onclick="deleteId('${id}')">Delete</button>`;
-                list.appendChild(li);
-            });
-        }
+        <hr>
 
-        async function addId() {
-            const pid = document.getElementById("newid").value;
-            await fetch('/test-ids?pid=' + pid, { method: 'POST' });
-            loadIds();
-        }
+        <!-- Add new pseudo ID -->
+        <h6>Add New ID</h6>
+        <div class="input-group mb-3">
+            <input id="newid" placeholder="Enter pseudo ID" class="form-control">
+            <button class="btn btn-primary" onclick="addId()">Add</button>
+        </div>
 
-        async function deleteId(pid) {
-            await fetch('/test-ids/' + pid, { method: 'DELETE' });
-            loadIds();
-        }
+    </div>
+</div>
 
+<!-- JS Section -->
+<script>
+    async function loadIds() {
+        const res = await fetch('/test-ids');
+        const data = await res.json();
+        const list = document.getElementById('list');
+        list.innerHTML = "";
+
+        data.ids.forEach(id => {
+            const li = document.createElement("li");
+            li.className = "list-group-item d-flex justify-content-between align-items-center";
+
+            li.innerHTML = `
+                <span>${id}</span>
+                <button class="btn btn-outline-danger btn-sm delete-btn" onclick="deleteId('${id}')">
+                    Delete
+                </button>
+            `;
+            list.appendChild(li);
+        });
+    }
+
+    async function addId() {
+        const pid = document.getElementById("newid").value.trim();
+        if (!pid) return;
+
+        await fetch('/test-ids?pid=' + pid, { method: 'POST' });
+        document.getElementById("newid").value = "";
         loadIds();
-    </script>
+    }
+
+    async function deleteId(pid) {
+        await fetch('/test-ids/' + pid, { method: 'DELETE' });
+        loadIds();
+    }
+
+    loadIds();
+</script>
+
 </body>
 </html>
