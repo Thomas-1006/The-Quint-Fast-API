@@ -5,9 +5,15 @@ import pandas as pd
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-from google.cloud import bigquery
 from fastapi.staticfiles import StaticFiles
+from google.cloud import bigquery
 
+# =========================
+# ENV MODE CONFIG
+# =========================
+# MODE = "testing" (safe for Render free tier)
+# MODE = "production" (UI can add/delete test IDs)
+MODE = os.getenv("MODE", "testing")
 
 # =======================
 # LOAD GOOGLE CREDENTIALS
@@ -31,8 +37,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # CORS CONFIG
 ALLOWED_ORIGINS = [
-    "https://thequint-malibu-beta.quintype.io",   # Beta
-    "https://www.thequint.com",                   # Prod
+    "https://thequint-malibu-beta.quintype.io",
+    "https://www.thequint.com",
     "https://thequint.com",
 ]
 
@@ -49,6 +55,7 @@ PROJECT_ID = os.getenv("BQ_PROJECT_ID", "the-quint-282107")
 
 # ====================
 # TEST ID STORAGE FILE
+# (Only used in production)
 # ====================
 TEST_IDS_FILE = "test_ids.json"
 
@@ -72,10 +79,6 @@ WITH base_events AS (
   SELECT
     e.user_pseudo_id,
     DATE(TIMESTAMP_MICROS(e.event_timestamp), "Asia/Kolkata") AS event_date,
-    (SELECT ep.value.int_value FROM UNNEST(e.event_params) ep WHERE ep.key = 'ga_session_id') AS ga_session_id,
-    (SELECT ep.value.int_value FROM UNNEST(e.event_params) ep WHERE ep.key = 'session_id') AS session_id,
-    e.event_bundle_sequence_id,
-    (SELECT ep.value.int_value FROM UNNEST(e.event_params) ep WHERE ep.key = 'engagement_time_msec') AS engagement_time_msec,
     e.event_name
   FROM `the-quint-282107.analytics_241044781.events_*` e
   WHERE
@@ -89,49 +92,65 @@ user_summary AS (
   FROM base_events
   GROUP BY user_pseudo_id
 )
-SELECT
-  user_pseudo_id
+SELECT user_pseudo_id
 FROM user_summary
 WHERE page_views > 0
 LIMIT 10;
 """
-
 
 # ====================
 # HOME UI PAGE
 # ====================
 @app.get("/", response_class=HTMLResponse)
 def home():
+    if MODE == "testing":
+        TEST_PSEUDO_IDS = [
+            "1949675162.1731393103",
+            "807797374.1729185992",
+        ]
+
+        html_list = "".join([f"<li class='list-group-item'>{pid}</li>" for pid in TEST_PSEUDO_IDS])
+
+        html = f"""
+        <h2>Testing Mode</h2>
+        <p>This server is running in <b>testing</b> mode on Render free tier.</p>
+        <ul class="list-group">{html_list}</ul>
+        <p style="margin-top:20px;">Switch MODE=production in Render to enable full UI.</p>
+        """
+        return HTMLResponse(html)
+
+    # PRODUCTION MODE → Load actual HTML file
     try:
         with open("templates/home.html", "r", encoding="utf-8") as f:
-            html = f.read()
-        return HTMLResponse(content=html)
+            return HTMLResponse(content=f.read())
     except Exception as e:
         return HTMLResponse(content=f"Error loading HTML file: {e}", status_code=500)
 
 
 # ====================
-# TEST ID API ENDPOINTS
+# TEST ID API ENDPOINTS (ONLY IN PRODUCTION MODE)
 # ====================
-@app.get("/test-ids")
-def get_test_ids():
-    return {"ids": load_test_ids()}
+if MODE == "production":
 
-@app.post("/test-ids")
-def add_test_id(pid: str):
-    ids = load_test_ids()
-    if pid not in ids:
-        ids.append(pid)
+    @app.get("/test-ids")
+    def get_test_ids():
+        return {"ids": load_test_ids()}
+
+    @app.post("/test-ids")
+    def add_test_id(pid: str):
+        ids = load_test_ids()
+        if pid not in ids:
+            ids.append(pid)
+            save_test_ids(ids)
+        return {"status": "added", "ids": ids}
+
+    @app.delete("/test-ids/{pid}")
+    def delete_test_id(pid: str):
+        ids = load_test_ids()
+        if pid in ids:
+            ids.remove(pid)
         save_test_ids(ids)
-    return {"status": "added", "ids": ids}
-
-@app.delete("/test-ids/{pid}")
-def delete_test_id(pid: str):
-    ids = load_test_ids()
-    if pid in ids:
-        ids.remove(pid)
-    save_test_ids(ids)
-    return {"status": "deleted", "ids": ids}
+        return {"status": "deleted", "ids": ids}
 
 
 # ====================
@@ -140,10 +159,21 @@ def delete_test_id(pid: str):
 @app.get("/top-users")
 def get_top_users():
 
-    # 1. Load test IDs
+    # ---- TESTING MODE ----
+    if MODE == "testing":
+        TEST_PSEUDO_IDS = [
+            "1949675162.1731393103",
+            "807797374.1729185992",
+        ]
+        return {
+            "status": "success",
+            "count": len(TEST_PSEUDO_IDS),
+            "data": [{"user_pseudo_id": pid} for pid in TEST_PSEUDO_IDS]
+        }
+
+    # ---- PRODUCTION MODE (UI-Dynamic IDs) ----
     TEST_PSEUDO_IDS = load_test_ids()
 
-    # 2. If test IDs exist → return them
     if TEST_PSEUDO_IDS:
         return {
             "status": "success",
@@ -151,7 +181,7 @@ def get_top_users():
             "data": [{"user_pseudo_id": pid} for pid in TEST_PSEUDO_IDS]
         }
 
-    # 3. Else → run BigQuery logic
+    # ---- BigQuery Fallback ----
     try:
         client = bigquery.Client(project=PROJECT_ID)
         df = client.query(QUERY).to_dataframe()
@@ -177,5 +207,5 @@ def get_top_users():
 # ====================
 if __name__ == "__main__":
     import uvicorn
-    print("Starting local API server at http://127.0.0.1:8000/")
+    print(f"Running in MODE={MODE}")
     uvicorn.run("pseudoAPI:app", host="127.0.0.1", port=8000, reload=True)
