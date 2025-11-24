@@ -165,7 +165,8 @@ def get_top_users():
     if MODE == "testing":
         TEST_PSEUDO_IDS = [
             "1949675162.1731393103",
-            "807797374.1729185992",
+            "99041712.1750863327",
+            "1138577764.1750936297",
         ]
         return {
             "status": "success",
