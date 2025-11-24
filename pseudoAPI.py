@@ -40,6 +40,7 @@ ALLOWED_ORIGINS = [
     "https://thequint-malibu-beta.quintype.io",
     "https://www.thequint.com",
     "https://thequint.com",
+    "http://localhost:3000",
 ]
 
 app.add_middleware(
@@ -106,7 +107,8 @@ def home():
     if MODE == "testing":
         TEST_PSEUDO_IDS = [
             "1949675162.1731393103",
-            "807797374.1729185992",
+            "99041712.1750863327",
+            "1138577764.1750936297",
         ]
 
         html_list = "".join([f"<li class='list-group-item'>{pid}</li>" for pid in TEST_PSEUDO_IDS])
