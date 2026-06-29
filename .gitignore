@@ -11,3 +11,9 @@ venv/
 
 # Secrets
 *.json
+
+# Environment
+.env
+
+# OS
+.DS_Store
